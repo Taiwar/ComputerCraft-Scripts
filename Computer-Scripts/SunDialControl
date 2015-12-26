@@ -1,0 +1,20 @@
+rside = "right"
+
+while true do
+	time = os.time()
+	while time < 6 do
+		print("Time: "..time.." is less than 6, fast forwarding...")
+		redstone.setOutput(rside, true)
+		sleep(0.5)
+		redstone.setOutput(rside, false)
+		time = os.time()
+	end
+	while time > 18 do
+		print("Time: "..time.." is more than 18, fast forwarding...")
+		redstone.setOutput(rside, true)
+		sleep(0.5)
+		redstone.setOutput(rside, false)
+		time = os.time()		
+	end
+	sleep(0.5)
+end			
