@@ -1,5 +1,6 @@
 comp = require "component"
 event = require "event"
+serialization = require "serialization"
 m = comp.modem
 r = comp.br_reactor
 r_data = {}
