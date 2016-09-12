@@ -1,5 +1,6 @@
 comp = require "component"
 event = require "event"
+serialization = require "serialization"
 g = comp.glasses
 m = comp.modem
 
