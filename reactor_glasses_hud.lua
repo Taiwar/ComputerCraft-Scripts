@@ -45,7 +45,7 @@ function displayFuel(fuel, waste, capacity, y)
     fuel_box.setColor(0.8431, 0.937, 0)
     fuel_box.setAlpha(0.9)
 
-    return waste_ratio*100
+    return tostring(waste_ratio*100).."%"
 end
 
 function addBgBox()
@@ -68,8 +68,8 @@ while true do
     g.removeAll()
     addBgBox()
     if r_data[1] then
-        addInfoText("Energy Output in RF/t: "..r_data[4], base_y)
-        addInfoText("Waste percentage: "..displayFuel(r_data[2], r_data[3], r_data[5], base_y + 10), base_y + 10)
+        addInfoText("Energy output in RF/t: "..r_data[4], base_y)
+        addInfoText("Waste: "..displayFuel(r_data[2], r_data[3], r_data[5], base_y + 10), base_y + 10)
     else
         addInfoText("Reactor offline", base_y)
     end
