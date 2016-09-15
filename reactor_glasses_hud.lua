@@ -8,13 +8,14 @@ g.removeAll()
 
 base_y = 40
 base_x = 10
-base_text_scale = 0.8;
+base_text_scale = 0.8
+primary_color = {1, 1, 1}
 
 function addInfoText(text, y)
     local label = g.addTextLabel()
     label.setPosition(base_x, y)
     label.setScale(base_text_scale)
-    label.setColor(255, 20 , 20)
+    label.setColor(primary_color[1], primary_color[2] , primary_color[3])
     label.setAlpha(0.8)
     label.setText(text)
 end
@@ -28,12 +29,16 @@ function displayFuel(fuel, waste, capacity, y)
     local capacity_width = base_width - fuel_width + waste_width
     local waste_box = g.addRect()
     local fuel_box = g.addRect()
-    local capacity_box = g.addRect()
+    local capacity_end_box = g.addRect()
+    local capacity_start_box = g.addRect()
 
-    capacity_box.setSize(10, capacity_width)
-    capacity_box.setPosition(base_x + fuel_width + waste_width, y)
-    waste_box.setColor(0.8, 0.8, 0.8)
-    waste_box.setAlpha(0.7)
+    capacity_start_box.setSize(10.8, 0.8)
+    capacity_start_box.setPosition(base_x - 0.8, y-0.4)
+    capacity_start_box.setColor(primary_color[1], primary_color[2] , primary_color[3])
+
+    capacity_end_box.setSize(10.8, 0.8)
+    capacity_end_box.setPosition(base_x + fuel_width + waste_width + capacity_width, y-0.4)
+    capacity_end_box.setColor(1, 1, 1)
 
     waste_box.setSize(10, waste_width)
     waste_box.setPosition(base_x + fuel_width, y)
