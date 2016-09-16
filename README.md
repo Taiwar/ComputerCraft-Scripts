@@ -1,2 +1,2 @@
-# Computercraft-Scripts
-Lua scripts for Computercraft (a brilliant mod for Minecraft by dan200) turtles and computers.
+# Computercraft and OpenComputers scripts
+Lua scripts for Computercraft turtles and computers and OpenComputers.
