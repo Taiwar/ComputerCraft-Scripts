@@ -1,2 +1,2 @@
-# Computercraft and OpenComputers scripts
-Lua scripts for Computercraft turtles and computers and OpenComputers.
+# Computercraft scripts
+Lua scripts for Computercraft turtles and computers
