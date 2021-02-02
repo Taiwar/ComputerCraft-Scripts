@@ -15,8 +15,11 @@ function freeSlot(original, current)
         end
         return true
     else
-        local next = (current + 1) % 16
-        if next == current then
+        local next = (current + 1) % 17 -- since lua starts arrays at 1 we count to 17
+        if next == 0 then
+            next = 1 -- we need to count up by one since index 0 doesn't exist
+        end
+        if next == original then
             return false
         else
             return freeSlot(original, next)
@@ -27,6 +30,8 @@ end
 
 -- TODO: Handle products that are more than inputs? (could be more than 1 stack output)
 -- TODO: Optimize smelt-times by merging stacks
+-- TODO: Only start process when items were added to inv
+-- TODO: Don't "forget" items added during a loop (might already be solved? maybe by pullEvent being a queue?)
 while true do
     os.pullEvent('turtle_inventory')
     p.print(p.text('Inv changed, smelting...', colors.blue))
