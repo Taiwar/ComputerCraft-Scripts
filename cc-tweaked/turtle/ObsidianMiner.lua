@@ -1,5 +1,9 @@
 local p = require('cc.pretty')
 
+local BLOCK_NAME = "minecraft:obsidian"
+local START_SLOT = 1
+local REFUEL_SLOT = 16
+
 local world = {}
 for x = -30, 30 do
   world[x] = {}
@@ -11,9 +15,10 @@ for x = -30, 30 do
   end
 end
 
-local found_obsidian = true
+local found_block = true
 local curr_coords = { x = 0 , y = 0, z = 0 }
 local facing = 0 -- 0 is forward, +1 is one rotation clockwise
+local totalMined = 0
 
 function detectNeighbors(onlyDown)
   -- Inspect down
@@ -68,20 +73,20 @@ function detectNeighbors(onlyDown)
   end
 end
 
-function findObsidian()
+function findBlockToMine()
   local found = false
-  local obsidian_coords
+  local block_coords
   for x, _ in pairs(world) do
     for y, _ in pairs(world[x]) do
       for z, block in pairs(world[x][y]) do
-        if block == "minecraft:obsidian" then
+        if block == BLOCK_NAME then
           found = true
-          obsidian_coords = { x = x , y = y, z = z }
+          block_coords = { x = x , y = y, z = z }
         end
       end
     end
   end
-  return found, obsidian_coords
+  return found, block_coords
 end
 
 function moveAbove(coords)
@@ -119,6 +124,8 @@ function mine(coords)
   while curr_coords.y ~= 0 do
     move('up')
   end
+
+  totalMined = totalMined + 1
 end
 
 function turn(direction)
@@ -132,8 +139,6 @@ function turn(direction)
 end
 
 function move(direction)
-  p.print('Curr_cords: '..p.pretty(curr_coords))
-  print('moving '..direction)
   local movement = 0
   if direction == 'up' then
     turtle.up()
@@ -155,23 +160,34 @@ function move(direction)
       curr_coords.z = curr_coords.z + movement
     end
   end
-  print('moved')
-  p.print('Curr_cords: '..p.pretty(curr_coords))
 end
 
-repeat
-  p.print('Curr_cords: '..p.pretty(curr_coords))
-  print('Detect neighbors')
-  detectNeighbors(true)
-  local found, obsidian_coords = findObsidian()
-  p.print('Obs_coords: '..p.pretty(obsidian_coords))
-  if found then
-    moveAbove(obsidian_coords)
-    p.print('Curr_cords: '..p.pretty(obsidian_coords))
-    print('mining')
-    mine(obsidian_coords)
+function checkFuel()
+  p.print(p.text('Fuel: '..turtle.getFuelLevel(), colors.blue))
+  if turtle.getFuelLevel() < 10 then
+    p.print(p.text('Refueling', colors.orange))
+    local slot = turtle.getSelectedSlot()
+    turtle.select(REFUEL_SLOT)
+    local success = turtle.refuel()
+    turtle.select(slot)
+    if not success then
+      error('Ran out of fuel!')
+    end
   end
-  found_obsidian = found
-until not found_obsidian
+end
 
-p.print(p.text('Exiting: No more obsidian found! ', colors.orange))
+p.print(p.text('Looking for: '..BLOCK_NAME, colors.purple))
+turtle.select(START_SLOT)
+repeat
+  checkFuel()
+  detectNeighbors(true)
+  local found, block_coords = findBlockToMine()
+  if found then
+    p.print(p.text('Mining block at: '..block_coords.x..', '..block_coords.y..', '..block_coords.z, colors.purple))
+    moveAbove(block_coords)
+    mine(block_coords)
+  end
+  found_block = found
+until not found_block
+
+p.print(p.text('No more blocks found! Total mined: '..totalMined, colors.green))
