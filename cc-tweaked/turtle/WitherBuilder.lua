@@ -2,11 +2,6 @@ local MAIN_LOOP_TIMER = 20
 local WITHER_SPAWN_TIMER = 10
 local WITHER_KILL_TIMER = 5
 
-local FLOOR_BLOCK_SLOT = 4
-
-local FUEL_SLOT = 1
-local FUEL_ITEM = "minecraft:coal"
-
 local WITHER_BODY_SLOT = 2
 local WITHER_BODY_ITEM = "minecraft:soul_sand"
 local WITHER_HEAD_SLOT = 3
@@ -14,9 +9,24 @@ local WITHER_HEAD_ITEM = "minecraft:wither_skeleton_skull"
 -- For testing
 -- local WITHER_HEAD_ITEM = "minecraft:sand"
 
+local FLOOR_BLOCK_SLOT = 4
+
+local FUEL_SLOT = 1
+local FUEL_ITEM = "powah:battery_nitro"
+local USE_ELECTRICAL_FUEL_ITEM = true
+
+-- Only necessary if USE_ELECTRICAL_FUEL_ITEM=true
+local AUTOMATA_SIDE = "left"
+local CHARGE_TIMER = 10
+
 local bridge = peripheral.find("rsBridge")
 
 if bridge == nil then error("rsBridge not found") end
+
+if USE_ELECTRICAL_FUEL_ITEM then
+    automata = peripheral.wrap(AUTOMATA_SIDE)
+    if automata == nil then error("automata not found") end
+end
 
 function refuel()
     turtle.select(FUEL_SLOT)
@@ -31,17 +41,40 @@ function refuel()
         -- TODO: Check if items actually present
     end
 
-
     local level = turtle.getFuelLevel()
     local maxLevel = turtle.getFuelLimit()
     if level / maxLevel < 0.8 then
-        local ok, err = turtle.refuel()
-        if ok then
-            local new_level = turtle.getFuelLevel()
-            print(("Refuelled %d, current level is %d"):format(new_level - level, new_level))
+        if USE_ELECTRICAL_FUEL_ITEM then
+            rechargeFuelItem()
+            repeat
+                local success, amount = automata.chargeTurtle(1000)
+                if not success then
+                    print("Error! Could not recharge from electrical fuel item!")
+                end
+            until turtle.getFuelLevel() ~= maxLevel
         else
-            printError(err)
+            local ok, err = turtle.refuel()
+            if ok then
+                local new_level = turtle.getFuelLevel()
+                print(("Refuelled %d, current level is %d"):format(new_level - level, new_level))
+            else
+                printError(err)
+            end
         end
+    end
+end
+
+function rechargeFuelItem()
+    local fuelData = turtle.getItemDetail(FUEL_SLOT)
+    -- This could depend on the item you're using. With Powah cells the durability attribute disappears when they're full.
+    if fuelData['durability'] ~= nil then
+        turtle.select(FUEL_SLOT)
+        -- IMPORTANT: We assume that a charger like a Mekanism energy cube is left of the turtle's base position
+        turtle.turnLeft()
+        turtle.drop()
+        sleep(CHARGE_TIMER)
+        turtle.suck()
+        turtle.turnRight()
     end
 end
 
@@ -163,17 +196,18 @@ end
 while true do
     print("Refueling")
     refuel()
-    if requestMaterials() then
-        print("Successfully Requested materials")
-        print("Entering")
-        enterChamber()
-        print("Building")
-        buildWither()
-        print("Exiting")
-        exitChamber()
-    else
-        print("Error when requesting materials")
-    end
-    print("Sleeping")
+
+    -- if requestMaterials() then
+    --     print("Successfully Requested materials")
+    --     print("Entering")
+    --     enterChamber()
+    --     print("Building")
+    --     buildWither()
+    --     print("Exiting")
+    --     exitChamber()
+    -- else
+    --     print("Error when requesting materials")
+    -- end
+    -- print("Sleeping")
     sleep(MAIN_LOOP_TIMER)
 end

@@ -1,6 +1,8 @@
 {
     "Lua.diagnostics.globals": [
         "turtle",
-        "printError"
+        "printError",
+        "peripheral",
+        "redstone"
     ]
 }
