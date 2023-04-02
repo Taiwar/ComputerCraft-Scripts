@@ -5,7 +5,7 @@ local TITLE = "---ESSENCE CRAFTER---"
 local STATE = ""
 
 -- Constants for operation
-local OUTPUT_SLOT = 4
+local OUTPUT_SLOT = 5
 local INPUT_SLOT = 1
 local EXPORT_DIRECTION = "up"
 local MIN_STOCK = 9
@@ -24,7 +24,9 @@ item = {
 -- String constants to make writing exclusions easier and less error-prone
 local MYSTICAL_AGRICULTURE = "mysticalagriculture:"
 local MYSTICAL_AGRADDITIONS = "mysticalagradditions:"
+local MINECRAFT = "minecraft:"
 local ESSENCE = "_essence"
+local DEFAULT = "default"
 
 local LOOP = true -- Continously get all essences from AE system and craft them
 local LOOP_TIMEOUT = 20 -- Time to wait between loop iterations (in s)
@@ -43,11 +45,12 @@ local exclusions = {
     MYSTICAL_AGRICULTURE.."dirt"..ESSENCE,
     MYSTICAL_AGRICULTURE.."nature"..ESSENCE,
     MYSTICAL_AGRICULTURE.."dye"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."wood"..ESSENCE,
+    -- MYSTICAL_AGRICULTURE.."wood"..ESSENCE,
     MYSTICAL_AGRICULTURE.."water"..ESSENCE,
     MYSTICAL_AGRICULTURE.."ice"..ESSENCE,
     MYSTICAL_AGRICULTURE.."fire"..ESSENCE,
     MYSTICAL_AGRICULTURE.."nether"..ESSENCE,
+    MYSTICAL_AGRICULTURE.."nature"..ESSENCE,
     MYSTICAL_AGRICULTURE.."nether_quartz"..ESSENCE,
     MYSTICAL_AGRICULTURE.."experience"..ESSENCE,
     MYSTICAL_AGRICULTURE.."rabbit"..ESSENCE,
@@ -58,7 +61,7 @@ local exclusions = {
 -- 0 = none
 -- anything else = amount provided / given positions
 local recipes = {
-    default = {
+    [DEFAULT] = {
         1, 1, 1,
         1, 0, 1,
         1, 1, 1
@@ -73,10 +76,20 @@ local recipes = {
         0, 1, 0,
         1, 1, 1
     },
-    line = {
+    line1 = {
         1, 1, 1,
         0, 0, 0,
         0, 0, 0
+    },
+    line2 = {
+        0, 0, 0,
+        1, 1, 1,
+        0, 0, 0
+    },
+    line3 = {
+        0, 0, 0,
+        0, 0, 0,
+        1, 1, 1
     },
     cross = {
         0, 1, 0,
@@ -86,20 +99,43 @@ local recipes = {
 }
 
 local craftingTableMapping = {
+    2, 3, 4,
     6, 7, 8,
-    10, 11, 12,
-    14, 15, 16
+    10, 11, 12
 }
 
--- Set up mappings of essence-name to recipe-layout
-local mappings = {}
-mappings[MYSTICAL_AGRICULTURE.."diamond"..ESSENCE] = recipes["full"]
-mappings[MYSTICAL_AGRICULTURE.."silicon"..ESSENCE] = recipes["line"]
-mappings[MYSTICAL_AGRICULTURE.."rubber"..ESSENCE] = recipes["line"]
-mappings[MYSTICAL_AGRICULTURE.."blizz"..ESSENCE] = recipes["cross"]
-mappings[MYSTICAL_AGRICULTURE.."basalz"..ESSENCE] = recipes["cross"]
-mappings[MYSTICAL_AGRICULTURE.."blitz"..ESSENCE] = recipes["cross"]
-mappings[MYSTICAL_AGRICULTURE.."saltpeter"..ESSENCE] = recipes["line"]
+-- Set up mappings of essence-name to product recipes
+local productMappings = {
+    [DEFAULT] = {
+        [DEFAULT] = {
+            recipe = recipes[DEFAULT]
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."diamond"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["full"]
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."silicon"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["line1"]
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."wood"..ESSENCE] = {
+        [MINECRAFT.."oak_log"] = {
+            recipe = recipes["line1"],
+            goal = 256
+        },
+        [MINECRAFT.."spruce_log"] = {
+            recipe = recipes["line2"],
+            goal = 256
+        },
+        [MINECRAFT.."birch_log"] = {
+            recipe = recipes["line3"],
+            goal = 256
+        }
+    }
+}
 
 local function info(state, task)
     term.clear()
@@ -152,13 +188,13 @@ local function findEssences(items)
 end
 
 -- Instructs a connected export bus to export a specific item from the database
-local function requestEssence(item, recipe)
-    local maxStackSize = math.min(64, item["amount"]-MIN_STOCK)
+local function requestEssence(name, stock, recipe)
+    local maxStackSize = math.min(64, stock-MIN_STOCK)
     local min = sumTable(recipe)
     local times = math.floor(maxStackSize / min)
     -- Trigger export once into robot-input-slot
     print("Requesting "..times.." times")
-    bridge.exportItem({name=item["name"], count=times*min}, EXPORT_DIRECTION)
+    bridge.exportItem({name=name, count=times*min}, EXPORT_DIRECTION)
 end
 
 -- Aligns essence into crafting grid
@@ -250,37 +286,51 @@ local function main()
     for _, item in pairs(essences) do
         info("Main", "Processing "..item["displayName"])
 
-        -- Craft until there's 9 essence in the RS system left
+
         local itemCount = item["amount"]
-        local recipe = recipes["default"]
+        local mapping = productMappings[DEFAULT]
 
         -- Check if there's an entry in mappings with this essence's name
-        if mappings[item["name"]] ~= nil then
+        if productMappings[item["name"]] ~= nil then
             -- Set recipe to the one in the matching mapping
-            recipe = mappings[item["name"]]
+            mapping = productMappings[item["name"]]
         end
 
-        local i = 0
-        while itemCount ~= nil and itemCount > (sumTable(recipe) + MIN_STOCK) do
-            i = i + 1
-            info("Main", i.." - Processing "..item["displayName"])
-            -- Request essence to be exported into turtle
-            requestEssence(item, recipe)
-            os.sleep(0.2) -- Give export bus some time
-            -- Start crafting
-            craftEssence(recipe)
+        for productName, instructions in pairs(mapping) do
+            local productInfo = bridge.getItem({name=productName})
+            local i = 0
+            local enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
+            local wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
+            local productDisplayName = productName == DEFAULT and DEFAULT or productInfo["displayName"]
+            -- Craft until minimum stock level is reached
+            while enoughStock and wantMoreProduct do
+                i = i + 1
+                info("Main", i.." - Processing "..item["displayName"].." to create "..productDisplayName)
+                print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
+                print("itemCount: "..itemCount)
+                -- Request essence to be exported into turtle
+                requestEssence(item["name"], itemCount, instructions["recipe"])
+                os.sleep(0.2) -- Give export bus some time
+                -- Start crafting
+                craftEssence(instructions["recipe"])
+    
+                -- Refresh count
+                local currentItem = bridge.getItem({name=item["name"]})
+                -- If item could be found in AE system get its count, otherwise set itemCount to 0.
+                if currentItem ~= nil then
+                    itemCount = currentItem["amount"];
+                else
+                    itemCount = 0
+                end
 
-            -- Refresh count
-            local currentItem = bridge.getItem({name=item["name"]})
-            -- If item could be found in AE system get its count, otherwise set itemCount to 0.
-            if currentItem ~= nil then
-                itemCount = currentItem["amount"];
-            else
-                itemCount = 0
-            end
-            if i > CRAFTING_MAX_ITER then
-                print("Reached max crafting iterations: Cleaning inv and moving on")
-                cleanInv()
+                if i > CRAFTING_MAX_ITER then
+                    print("Reached max crafting iterations: Cleaning inv and moving on")
+                    cleanInv()
+                end
+
+                productInfo = bridge.getItem({name=productName})
+                wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
+                enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
             end
         end
     end
