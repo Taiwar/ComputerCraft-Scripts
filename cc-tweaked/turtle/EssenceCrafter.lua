@@ -165,7 +165,7 @@ local productMappings = {
     [MYSTICAL_AGRICULTURE.."tertium"..ESSENCE] = {
         [MYSTICAL_AGRICULTURE.."imperium"..ESSENCE] = {
             recipe = recipes["hollowCross"],
-            goal = 32,
+            goal = 64,
             secondary = {
                 recipe = recipes["center"],
                 name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
@@ -175,7 +175,7 @@ local productMappings = {
     [MYSTICAL_AGRICULTURE.."prudentium"..ESSENCE] = {
         [MYSTICAL_AGRICULTURE.."tertium"..ESSENCE] = {
             recipe = recipes["hollowCross"],
-            goal = 64,
+            goal = 128,
             secondary = {
                 recipe = recipes["center"],
                 name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
@@ -185,7 +185,7 @@ local productMappings = {
     [MYSTICAL_AGRICULTURE.."inferium"..ESSENCE] = {
         [MYSTICAL_AGRICULTURE.."prudentium"..ESSENCE] = {
             recipe = recipes["hollowCross"],
-            goal = 64,
+            goal = 256,
             secondary = {
                 recipe = recipes["center"],
                 name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
@@ -438,6 +438,7 @@ local function main()
                 os.sleep(0.2) -- Give export bus some time
                 -- Start crafting
                 craftEssence(instructions["recipe"], secondaryRecipe)
+                os.sleep(1) -- Give interface some time
     
                 -- Refresh count
                 local currentItem = bridge.getItem({name=item["name"]})
@@ -451,17 +452,20 @@ local function main()
                 if i > CRAFTING_MAX_ITER then
                     print("Reached max crafting iterations: Cleaning inv and moving on")
                     cleanInv()
-                    return "got stuck crafting"
                 end
 
                 if needSecondary then
                     secondaryInfo = bridge.getItem({name=instructions["secondary"]["name"]})
+                    print("secondaryInfo: "..secondaryInfo["amount"])
                     secondaryCount = (secondaryInfo ~= nil and secondaryInfo["amount"]) or 0
-                    enoughSecondary = secondaryCount > sumTable(secondaryRecipe)
+                    print("secondaryCount: "..secondaryCount)
+                    enoughSecondary = secondaryCount >= sumTable(secondaryRecipe)
                 end
                 productInfo = bridge.getItem({name=productName})
                 wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
                 enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
+                print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
+                print("enoughSecondary: "..tostring(enoughSecondary))
             end
         end
     end
