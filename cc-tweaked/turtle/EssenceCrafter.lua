@@ -358,13 +358,16 @@ local function craftEssence(recipe, secondaryRecipe)
     if alignEssence(recipe, secondaryRecipe) then
         repeat
             local couldCraft = true
+            local outputAmount = 64 -- Assume highest
             -- Keep crafting and exporting while it works
             while couldCraft do
                 turtle.select(OUTPUT_SLOT)
                 -- always try to craft a bit less than a stack, so there's no overflow
-                couldCraft = turtle.craft(1) -- returns true if it was able to craft at least one result
+                couldCraft = turtle.craft(math.floor(64 / outputAmount)) -- returns true if it was able to craft at least one result
+                outputAmount = turtle.getItemCount(OUTPUT_SLOT)
                 -- if something is in outputSlot, export it
-                if turtle.getItemCount(OUTPUT_SLOT) > 0 then
+                if outputAmount > 0 then
+                    -- TODO: This is probably an error condition the user should be notified of
                     outputResult()
                 end
             end
