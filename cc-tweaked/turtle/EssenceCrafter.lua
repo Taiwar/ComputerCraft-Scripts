@@ -5,8 +5,10 @@ local TITLE = "---ESSENCE CRAFTER---"
 local STATE = ""
 
 -- Constants for operation
-local OUTPUT_SLOT = 5
+local OUTPUT_SLOT = 9
 local INPUT_SLOT = 1
+local SECONDARY_INPUT_SLOT = 5
+local SECONDARY_EXPORT_SLOT = 2
 local EXPORT_DIRECTION = "up"
 local MIN_STOCK = 9
 
@@ -35,11 +37,6 @@ local LOOP_TIMEOUT = 20 -- Time to wait between loop iterations (in s)
 -- These are mainly essences which have multiple recipes and you don't want to autocraft into one specific recipe all the time
 local exclusions = {
     MYSTICAL_AGRADDITIONS.."insanium"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."supremium"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."imperium"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."tertium"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."prudentium"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."inferium"..ESSENCE,
     MYSTICAL_AGRICULTURE.."fertilized"..ESSENCE,
     MYSTICAL_AGRICULTURE.."stone"..ESSENCE,
     MYSTICAL_AGRICULTURE.."dirt"..ESSENCE,
@@ -95,6 +92,16 @@ local recipes = {
         0, 1, 0,
         1, 1, 1,
         0, 1, 0
+    },
+    hollowCross = {
+        0, 1, 0,
+        1, 0, 1,
+        0, 1, 0
+    },
+    center = {
+        0, 0, 0,
+        0, 1, 0,
+        0, 0, 0
     }
 }
 
@@ -134,7 +141,57 @@ local productMappings = {
             recipe = recipes["line3"],
             goal = 256
         }
-    }
+    },
+    [MYSTICAL_AGRICULTURE.."supremium"..ESSENCE] = {
+        [MYSTICAL_AGRADDITIONS.."insanium"..ESSENCE] = {
+            recipe = recipes["hollowCross"],
+            goal = 1,
+            secondary = {
+                recipe = recipes["center"],
+                name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
+            }
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."imperium"..ESSENCE] = {
+        [MYSTICAL_AGRICULTURE.."supremium"..ESSENCE] = {
+            recipe = recipes["hollowCross"],
+            goal = 16,
+            secondary = {
+                recipe = recipes["center"],
+                name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
+            }
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."tertium"..ESSENCE] = {
+        [MYSTICAL_AGRICULTURE.."imperium"..ESSENCE] = {
+            recipe = recipes["hollowCross"],
+            goal = 32,
+            secondary = {
+                recipe = recipes["center"],
+                name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
+            }
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."prudentium"..ESSENCE] = {
+        [MYSTICAL_AGRICULTURE.."tertium"..ESSENCE] = {
+            recipe = recipes["hollowCross"],
+            goal = 64,
+            secondary = {
+                recipe = recipes["center"],
+                name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
+            }
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."inferium"..ESSENCE] = {
+        [MYSTICAL_AGRICULTURE.."prudentium"..ESSENCE] = {
+            recipe = recipes["hollowCross"],
+            goal = 64,
+            secondary = {
+                recipe = recipes["center"],
+                name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
+            }
+        }
+    },
 }
 
 local function info(state, task)
@@ -187,8 +244,9 @@ local function findEssences(items)
     return results
 end
 
--- Instructs a connected export bus to export a specific item from the database
+-- Instructs a connected export bus to export a specific item
 local function requestEssence(name, stock, recipe)
+    turtle.select(INPUT_SLOT)
     local maxStackSize = math.min(64, stock-MIN_STOCK)
     local min = sumTable(recipe)
     local times = math.floor(maxStackSize / min)
@@ -197,9 +255,22 @@ local function requestEssence(name, stock, recipe)
     bridge.exportItem({name=name, count=times*min}, EXPORT_DIRECTION)
 end
 
+-- Instructs a connected export bus to export a specific secondary item
+local function requestSecondary(name, stock, recipe)
+    turtle.select(SECONDARY_EXPORT_SLOT)
+    local maxStackSize = math.min(64, stock)
+    local min = sumTable(recipe)
+    local times = math.floor(maxStackSize / min)
+    -- Trigger export once into robot-input-slot
+    print("Requesting "..times.." times")
+    bridge.exportItem({name=name, count=times*min}, EXPORT_DIRECTION)
+    turtle.transferTo(SECONDARY_INPUT_SLOT)
+    turtle.select(INPUT_SLOT)
+end
+
 -- Aligns essence into crafting grid
 -- Returns: True if recipe could be formed at least once, otherwise false
-local function alignEssence(recipe)
+local function alignEssence(recipe, secondaryRecipe)
     print("alignEssence")
     local couldAlign = false
 
@@ -230,6 +301,37 @@ local function alignEssence(recipe)
             couldAlign = true
         end
     end
+    if secondaryRecipe == nil then
+        return couldAlign
+    end
+
+    print("alignSecondary")
+    turtle.select(SECONDARY_INPUT_SLOT)
+    local secondary = turtle.getItemDetail()
+
+    -- Only process further if there is secondary in the input slot
+    if secondary ~= nil then
+        -- Calculate amount of secondary per position in recipe
+        local amountPerPosition = 0
+        -- Avoid division by 0
+        if sumTable(secondaryRecipe) ~= 0 then
+            -- Amount per position is maximum (total / positions) rounded down
+            amountPerPosition = math.floor(secondary["count"] / sumTable(secondaryRecipe))
+        end
+
+        -- Only align items if pattern can be filled at least once
+        if amountPerPosition >= 1 then
+            for position, amount in pairs(secondaryRecipe) do
+                if amount > 0 then
+                    -- Map from recipe position to inventory position
+                    local slot = craftingTableMapping[position]
+                    -- Transfer calculated amount to slot in "crafting table"
+                    turtle.transferTo(slot, amountPerPosition)
+                end
+            end
+            couldAlign = true
+        end
+    end
     return couldAlign
 end
 
@@ -250,10 +352,10 @@ local function outputResult()
 end
 
 -- Craft essences in input slot until no longer possible
-local function craftEssence(recipe)
+local function craftEssence(recipe, secondaryRecipe)
     print("craftEssence")
     -- Only craft if essence could be aligned
-    if alignEssence(recipe) then
+    if alignEssence(recipe, secondaryRecipe) then
         repeat
             local couldCraft = true
             -- Keep crafting and exporting while it works
@@ -266,7 +368,7 @@ local function craftEssence(recipe)
                     outputResult()
                 end
             end
-        until not alignEssence(recipe) -- repeat until input is not enough to fill pattern anymore
+        until not alignEssence(recipe, secondaryRecipe) -- repeat until input is not enough to fill pattern anymore
     end
     cleanInv()
 end
@@ -301,21 +403,38 @@ local function main()
 
         for productName, instructions in pairs(mapping) do
             local productInfo = bridge.getItem({name=productName})
+            local secondaryInfo = nil
+            local secondaryRecipe = nil
+            local secondaryCount = 0
+            local enoughSecondary = true
+            local needSecondary = instructions["secondary"] ~= nil
+            if needSecondary then
+                secondaryRecipe = instructions["secondary"]["recipe"]
+                secondaryInfo = bridge.getItem({name=instructions["secondary"]["name"]})
+                secondaryCount = (secondaryInfo ~= nil and secondaryInfo["amount"]) or 0
+                enoughSecondary = secondaryCount >= sumTable(secondaryRecipe)
+                print("2nd info: "..secondaryInfo["name"].."-"..secondaryCount..", enoughSecondary: "..tostring(enoughSecondary))
+            end
+
             local i = 0
             local enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
             local wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
             local productDisplayName = productName == DEFAULT and DEFAULT or productInfo["displayName"]
+
             -- Craft until minimum stock level is reached
-            while enoughStock and wantMoreProduct do
+            while enoughStock and wantMoreProduct and enoughSecondary do
                 i = i + 1
                 info("Main", i.." - Processing "..item["displayName"].." to create "..productDisplayName)
                 print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
                 print("itemCount: "..itemCount)
                 -- Request essence to be exported into turtle
                 requestEssence(item["name"], itemCount, instructions["recipe"])
+                if needSecondary then
+                    requestSecondary(instructions["secondary"]["name"], secondaryCount, secondaryRecipe) 
+                end
                 os.sleep(0.2) -- Give export bus some time
                 -- Start crafting
-                craftEssence(instructions["recipe"])
+                craftEssence(instructions["recipe"], secondaryRecipe)
     
                 -- Refresh count
                 local currentItem = bridge.getItem({name=item["name"]})
@@ -332,6 +451,11 @@ local function main()
                     return "got stuck crafting"
                 end
 
+                if needSecondary then
+                    secondaryInfo = bridge.getItem({name=instructions["secondary"]["name"]})
+                    secondaryCount = (secondaryInfo ~= nil and secondaryInfo["amount"]) or 0
+                    enoughSecondary = secondaryCount > sumTable(secondaryRecipe)
+                end
                 productInfo = bridge.getItem({name=productName})
                 wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
                 enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
