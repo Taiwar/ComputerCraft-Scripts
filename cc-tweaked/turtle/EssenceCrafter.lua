@@ -278,6 +278,9 @@ local function main()
     info("Main", "Gathering info")
     -- Fetch all items currents in network
     local currentState = bridge.listItems()
+    if currentState == nil then
+        return "no items found"
+    end
 
     -- Find/Filter all essences we want to process
     info("Main", "Filtering info")
@@ -326,6 +329,7 @@ local function main()
                 if i > CRAFTING_MAX_ITER then
                     print("Reached max crafting iterations: Cleaning inv and moving on")
                     cleanInv()
+                    return "got stuck crafting"
                 end
 
                 productInfo = bridge.getItem({name=productName})
@@ -334,14 +338,15 @@ local function main()
             end
         end
     end
+    return "successfully completed cycle"
 end
 
 if LOOP then
     while true do
         info("Root", "Cleaning")
         cleanInv()
-        main()
-        info("Root", "Sleeping")
+        local result = main()
+        info("Root", "Sleeping: "..result)
         os.sleep(LOOP_TIMEOUT)
     end
 else
