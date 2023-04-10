@@ -118,6 +118,11 @@ local productMappings = {
             recipe = recipes[DEFAULT]
         }
     },
+    [MYSTICAL_AGRICULTURE.."nether_star"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["full"]
+        }
+    },
     [MYSTICAL_AGRICULTURE.."diamond"..ESSENCE] = {
         [DEFAULT] = {
             recipe = recipes["full"]
@@ -155,7 +160,7 @@ local productMappings = {
     [MYSTICAL_AGRICULTURE.."imperium"..ESSENCE] = {
         [MYSTICAL_AGRICULTURE.."supremium"..ESSENCE] = {
             recipe = recipes["hollowCross"],
-            goal = 16,
+            goal = 32,
             secondary = {
                 recipe = recipes["center"],
                 name = MYSTICAL_AGRICULTURE.."master_infusion_crystal"
