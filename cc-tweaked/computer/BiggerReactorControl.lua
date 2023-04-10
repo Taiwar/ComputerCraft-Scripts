@@ -10,15 +10,20 @@ local capacity = reactor.battery().capacity()
 local TITLE = "---REACTOR CONTROL---"
 local CAPACITY = "Capacity: "..(capacity/1000000).." MFE"
 local STATE = "Getting initial sample"
+local lastDelta = 0
 
-local function info(stored, rodLevel, temp, task)
+local TPS = 20
+
+local function info(stored, rodLevel, temp, delta, task)
+    local d = (math.floor(delta) == 0 and lastDelta) or delta
     term.clear()
     term.setCursorPos(1, 1)
     p.print(p.text(TITLE, colors.yellow))
     p.print(p.text(CAPACITY, colors.blue))
     p.print(p.text("Rods level: "..rodLevel, colors.orange))
-    p.print(p.text("Temperature: "..temp, colors.red))
-    p.print(p.text("Stored: "..(stored/1000000).." MFE", colors.green))
+    p.print(p.text("Temperature: "..string.format("%.2f", temp).." K", colors.red))
+    p.print(p.text("Stored: "..string.format("%.2f", stored/1000000).." MFE", colors.green))
+    p.print(p.text("Flow: "..string.format("%.2f", (-1*d/1000)/TPS).." kFE/t", (d <= 0 and colors.green) or colors.red))
     p.print(p.text("-------------", colors.lightGray))
     p.print(p.text("State: "..STATE, colors.white))
     p.print(p.text("Task: "..task, colors.white))
@@ -38,11 +43,13 @@ local function verboseWait(time, label)
         return
     end
     local current = 0
+    local lastStored = reactor.battery().stored()
     while current < time do
         local stored = reactor.battery().stored()
+        local delta = lastStored - stored
         local rodLevel = math.floor(getCurrentRodLevel())
         local temp = reactor.casingTemperature()
-        info(stored, rodLevel, temp, label.." "..time-current.."s...")
+        info(stored, rodLevel, temp, delta, label.." "..time-current.."s...")
         os.sleep(1)
         current = current + 1
     end
@@ -58,7 +65,6 @@ end
 
 local lastStored = reactor.battery().stored()
 local currentRodLevel = math.floor(getCurrentRodLevel())
-local lastDelta = 0
 verboseWait(1, "Waiting")
 while true do
     local currentStored = reactor.battery().stored()
