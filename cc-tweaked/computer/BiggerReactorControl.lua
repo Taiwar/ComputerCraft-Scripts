@@ -1,4 +1,5 @@
 local p = require("cc.pretty")
+local monitor = peripheral.find("monitor")
 
 local reactor = peripheral.find("BiggerReactors_Reactor")
 
@@ -14,19 +15,39 @@ local lastDelta = 0
 
 local TPS = 20
 
+if monitor ~= nil then
+    monitor.setTextScale(.5)
+end
+
+local function mPrint(line, text, color)
+    monitor.setCursorPos(1, line)
+    monitor.setTextColor(color)
+    monitor.setBackgroundColor(colors.black)
+    monitor.write(text.."\n")
+end
+
 local function info(stored, rodLevel, temp, delta, task)
     local d = (math.floor(delta) == 0 and lastDelta) or delta
     term.clear()
     term.setCursorPos(1, 1)
     p.print(p.text(TITLE, colors.yellow))
     p.print(p.text(CAPACITY, colors.blue))
-    p.print(p.text("Rods level: "..rodLevel, colors.orange))
-    p.print(p.text("Temperature: "..string.format("%.2f", temp).." K", colors.red))
     p.print(p.text("Stored: "..string.format("%.2f", stored/1000000).." MFE", colors.green))
+    p.print(p.text("Rods level: "..rodLevel, colors.orange))
+    p.print(p.text("Temperature: "..string.format("%.2f", temp).." K", colors.orange))
     p.print(p.text("Flow: "..string.format("%.2f", (-1*d/1000)/TPS).." kFE/t", (d <= 0 and colors.green) or colors.red))
     p.print(p.text("-------------", colors.lightGray))
     p.print(p.text("State: "..STATE, colors.white))
     p.print(p.text("Task: "..task, colors.white))
+    if monitor ~= nil then
+        monitor.clear()
+        mPrint(1, TITLE, colors.yellow)
+        mPrint(2, CAPACITY, colors.blue)
+        mPrint(5, "Stored: "..string.format("%.2f", stored/1000000).." MFE", colors.green)
+        mPrint(3, "Rods level: "..rodLevel, colors.orange)
+        mPrint(4, "Temperature: "..string.format("%.2f", temp).." K", colors.orange)
+        mPrint(6, "Flow: "..string.format("%.2f", (-1*d/1000)/TPS).." kFE/t", (d <= 0 and colors.green) or colors.red)
+    end
 end
 
 local function getCurrentRodLevel()
