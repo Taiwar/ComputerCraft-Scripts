@@ -118,6 +118,11 @@ local productMappings = {
             recipe = recipes[DEFAULT]
         }
     },
+    [MYSTICAL_AGRICULTURE.."sulfur"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["line1"]
+        }
+    },
     [MYSTICAL_AGRICULTURE.."nether_star"..ESSENCE] = {
         [DEFAULT] = {
             recipe = recipes["full"]
