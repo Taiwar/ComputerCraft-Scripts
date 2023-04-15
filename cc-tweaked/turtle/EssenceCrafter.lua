@@ -51,7 +51,8 @@ local exclusions = {
     MYSTICAL_AGRICULTURE.."nether_quartz"..ESSENCE,
     MYSTICAL_AGRICULTURE.."experience"..ESSENCE,
     MYSTICAL_AGRICULTURE.."rabbit"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."mystical_flower"..ESSENCE
+    MYSTICAL_AGRICULTURE.."mystical_flower"..ESSENCE,
+    MYSTICAL_AGRICULTURE.."prismarine"..ESSENCE
 }
 
 -- Predefined recipes for crafting essences
@@ -261,8 +262,11 @@ local function requestEssence(name, stock, recipe)
     local min = sumTable(recipe)
     local times = math.floor(maxStackSize / min)
     -- Trigger export once into robot-input-slot
-    print("Requesting "..times.." times")
-    bridge.exportItem({name=name, count=times*min}, EXPORT_DIRECTION)
+    local count = times*min
+    print("Requesting "..count.." times: "..name)
+    local actual = bridge.exportItem({name=name, count=count}, EXPORT_DIRECTION)
+    print("Got "..actual)
+    return actual == count
 end
 
 -- Instructs a connected export bus to export a specific secondary item
@@ -272,10 +276,13 @@ local function requestSecondary(name, stock, recipe)
     local min = sumTable(recipe)
     local times = math.floor(maxStackSize / min)
     -- Trigger export once into robot-input-slot
-    print("Requesting "..times.." times")
-    bridge.exportItem({name=name, count=times*min}, EXPORT_DIRECTION)
+    local count = times*min
+    print("Requesting secondary "..count.." times: "..name)
+    local actual = bridge.exportItem({name=name, count=count}, EXPORT_DIRECTION)
+    print("Got "..actual)
     turtle.transferTo(SECONDARY_INPUT_SLOT)
     turtle.select(INPUT_SLOT)
+    return actual == count
 end
 
 -- Aligns essence into crafting grid
@@ -386,7 +393,7 @@ local function craftEssence(recipe, secondaryRecipe)
     cleanInv()
 end
 
-local CRAFTING_MAX_ITER = 100
+local CRAFTING_MAX_ITER = 50
 
 -- Main program function
 local function main()
@@ -435,47 +442,49 @@ local function main()
             local productDisplayName = productName == DEFAULT and DEFAULT or productInfo["displayName"]
 
             -- Craft until minimum stock level is reached
-            while enoughStock and wantMoreProduct and enoughSecondary do
+            while enoughStock and wantMoreProduct and enoughSecondary and i < CRAFTING_MAX_ITER do
                 i = i + 1
                 info("Main", i.." - Processing "..item["displayName"].." to create "..productDisplayName)
                 print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
                 print("itemCount: "..itemCount)
                 -- Request essence to be exported into turtle
-                requestEssence(item["name"], itemCount, instructions["recipe"])
+                local fulfilled = requestEssence(item["name"], itemCount, instructions["recipe"])
                 if needSecondary then
-                    requestSecondary(instructions["secondary"]["name"], secondaryCount, secondaryRecipe) 
+                    fulfilled = fulfilled and requestSecondary(instructions["secondary"]["name"], secondaryCount, secondaryRecipe) 
                 end
-                os.sleep(0.2) -- Give export bus some time
-                -- Start crafting
-                craftEssence(instructions["recipe"], secondaryRecipe)
-                os.sleep(1) -- Give interface some time
-    
-                -- Refresh count
-                local currentItem = bridge.getItem({name=item["name"]})
-                -- If item could be found in AE system get its count, otherwise set itemCount to 0.
-                if currentItem ~= nil then
-                    itemCount = currentItem["amount"];
-                else
-                    itemCount = 0
-                end
-
-                if i > CRAFTING_MAX_ITER then
-                    print("Reached max crafting iterations: Cleaning inv and moving on")
+                if not fulfilled then
+                    print("Requests were not fulfilled by RS. Skipping.")
                     cleanInv()
+                    enoughStock = false
+                else
+                    os.sleep(0.2) -- Give export bus some time
+                    -- Start crafting
+                    craftEssence(instructions["recipe"], secondaryRecipe)
+                    os.sleep(1) -- Give interface some time
+        
+                    -- Refresh count
+                    local currentItem = bridge.getItem({name=item["name"]})
+                    -- If item could be found in AE system get its count, otherwise set itemCount to 0.
+                    if currentItem ~= nil then
+                        itemCount = currentItem["amount"];
+                    else
+                        itemCount = 0
+                    end
+    
+                    if needSecondary then
+                        secondaryInfo = bridge.getItem({name=instructions["secondary"]["name"]})
+                        print("secondaryInfo: "..secondaryInfo["amount"])
+                        secondaryCount = (secondaryInfo ~= nil and secondaryInfo["amount"]) or 0
+                        print("secondaryCount: "..secondaryCount)
+                        enoughSecondary = secondaryCount >= sumTable(secondaryRecipe)
+                    end
+                    productInfo = bridge.getItem({name=productName})
+                    wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
+                    enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
+                    print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
+                    print("enoughSecondary: "..tostring(enoughSecondary))
                 end
 
-                if needSecondary then
-                    secondaryInfo = bridge.getItem({name=instructions["secondary"]["name"]})
-                    print("secondaryInfo: "..secondaryInfo["amount"])
-                    secondaryCount = (secondaryInfo ~= nil and secondaryInfo["amount"]) or 0
-                    print("secondaryCount: "..secondaryCount)
-                    enoughSecondary = secondaryCount >= sumTable(secondaryRecipe)
-                end
-                productInfo = bridge.getItem({name=productName})
-                wantMoreProduct = productName == DEFAULT or (productInfo ~= nil and productInfo["amount"] < instructions["goal"])
-                enoughStock = itemCount ~= nil and itemCount > (sumTable(instructions["recipe"]) + MIN_STOCK)
-                print("enoughStock: "..tostring(enoughStock).." wantMoreProduct: "..tostring(wantMoreProduct))
-                print("enoughSecondary: "..tostring(enoughSecondary))
             end
         end
     end
