@@ -10,7 +10,7 @@ local INPUT_SLOT = 1
 local SECONDARY_INPUT_SLOT = 5
 local SECONDARY_EXPORT_SLOT = 2
 local EXPORT_DIRECTION = "up"
-local MIN_STOCK = 9
+local MIN_STOCK = 32
 
 -- Example RS item structure
 --[[ 
@@ -52,7 +52,8 @@ local exclusions = {
     MYSTICAL_AGRICULTURE.."experience"..ESSENCE,
     MYSTICAL_AGRICULTURE.."rabbit"..ESSENCE,
     MYSTICAL_AGRICULTURE.."mystical_flower"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."prismarine"..ESSENCE
+    MYSTICAL_AGRICULTURE.."prismarine"..ESSENCE,
+    MYSTICAL_AGRICULTURE.."end"..ESSENCE
 }
 
 -- Predefined recipes for crafting essences
