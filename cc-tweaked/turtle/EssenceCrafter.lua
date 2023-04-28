@@ -57,7 +57,8 @@ local exclusions = {
     MYSTICAL_AGRICULTURE.."prismarine"..ESSENCE,
     MYSTICAL_AGRICULTURE.."spider"..ESSENCE,
     MYSTICAL_AGRICULTURE.."skeleton"..ESSENCE,
-    MYSTICAL_AGRICULTURE.."wither_skeleton"..ESSENCE
+    MYSTICAL_AGRICULTURE.."wither_skeleton"..ESSENCE,
+    MYSTICAL_AGRICULTURE.."menril"..ESSENCE
 }
 
 -- Predefined recipes for crafting essences
