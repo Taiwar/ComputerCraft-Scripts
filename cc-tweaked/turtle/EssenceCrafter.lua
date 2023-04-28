@@ -130,6 +130,26 @@ local productMappings = {
             recipe = recipes["line1"]
         }
     },
+    [MYSTICAL_AGRICULTURE.."niotic_crystal"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["full"]
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."spirited_crystal"..ESSENCE] = {
+        [DEFAULT] = {
+            recipe = recipes["full"]
+        }
+    },
+    [MYSTICAL_AGRICULTURE.."nitro_crystal"..ESSENCE] = {
+        ["powah:crystal_nitro"] = {
+            recipe = recipes[DEFAULT],
+            goal = 64,
+            secondary = {
+                recipe = recipes["center"],
+                name = "minecraft:nether_star"
+            }
+        }
+    },
     [MYSTICAL_AGRICULTURE.."nether_star"..ESSENCE] = {
         [DEFAULT] = {
             recipe = recipes["full"]
