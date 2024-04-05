@@ -264,8 +264,7 @@ local function shouldMoveDown()
     return not hasBlock and data["name"] ~= "minecraft:water"
 end
 
--- Decide on move and trace path
-local function nextMove()
+local function raiseAboveObstacle()
     -- Check if we can move forward and if not, move up
     while turtle.detect() do
         local s = contextAwareUp()
@@ -274,17 +273,12 @@ local function nextMove()
             dumpPositionLogToFile()
         end
     end
-    -- Do actual move
-    local s = contextAwareForward()
-    if s and isPathTracing then
-        table.insert(path, current)
-        dumpPositionLogToFile()
-    end
-    -- Check if we can move down (we want to be as close to the ground as possible)
+end
 
-    -- Check if we can move down or if there is water
+local function lowerToGround()
+    -- Check if we can move down (we want to be as close to the ground as possible)
     while shouldMoveDown() do
-        s = contextAwareDown()
+        local s = contextAwareDown()
         if s and isPathTracing then
             table.insert(path, current)
             dumpPositionLogToFile()
@@ -292,9 +286,23 @@ local function nextMove()
     end
 end
 
+-- Decide on move and trace path
+local function nextMove()
+    raiseAboveObstacle()
+    -- Do actual move
+    local s = contextAwareForward()
+    if s and isPathTracing then
+        table.insert(path, current)
+        dumpPositionLogToFile()
+    end
+    lowerToGround()
+end
+
 -- TODO: Handle obstacles/lane size changes
 local function handleFieldCrossing()
     local success = false;
+    
+    lowerToGround() -- Make sure we are as close to the ground as possible to know when we are over the farm
     -- Check if block below is water
     local hasBlock, data = turtle.inspectDown()
     if hasBlock and data["name"] == "minecraft:water" then
@@ -302,26 +310,31 @@ local function handleFieldCrossing()
        -- Expect single block wide water streak -> Turn and move one more block
        if facing == "south" then
             contextAwareTurnRight()
-            local s = contextAwareForward()
+            raiseAboveObstacle()
+            success = contextAwareForward()
             contextAwareTurnLeft()
-            if s and isPathTracing then
+            if success and isPathTracing then
                 table.insert(path, current)
                 dumpPositionLogToFile()
             end
         elseif facing == "north" then
             contextAwareTurnLeft()
-            local s = contextAwareForward()
+            raiseAboveObstacle()
+            success = contextAwareForward()
             contextAwareTurnRight()
 
-            if s and isPathTracing then
+            if success and isPathTracing then
                 table.insert(path, current)
                 dumpPositionLogToFile()
             end
         else
             error("handleFieldCrossing: Unexpected facing direction")
         end
-        success = true
+        if not success then
+            error("handleFieldCrossing: Unexpected movement failure")
+        end
     end
+
     -- Check if block below is farmland now
     hasBlock, data = turtle.inspectDown()
     if hasBlock and data["name"] == "minecraft:farmland" then
