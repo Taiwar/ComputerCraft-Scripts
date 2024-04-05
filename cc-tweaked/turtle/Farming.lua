@@ -340,6 +340,10 @@ local function returnToStart()
             contextAwareDown()
         end
     end
+    -- Face north
+    while facing ~= "north" do
+        contextAwareTurnRight()
+    end
 end
 
 local function mainCycle()
