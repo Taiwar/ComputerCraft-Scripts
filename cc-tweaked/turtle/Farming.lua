@@ -33,7 +33,7 @@ end
 local function debug(message)
     p.print(p.text(message, colors.lightGray))
     -- Append log
-    table.insert(log, {level="debug", state=state, task=task, position=current})
+    table.insert(log, {level="debug", position=current})
 end
 
 local function dumpLogToFile()
