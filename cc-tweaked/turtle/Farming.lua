@@ -83,11 +83,11 @@ local function contextAwareForward()
         return false
     end
     if facing == "north" then
-        current = {x=current.x, y=current.y, z=current.z+1}
+        current = {x=current.x, y=current.y, z=current.z-1}
     elseif facing == "east" then
         current = {x=current.x+1, y=current.y, z=current.z}
     elseif facing == "south" then
-        current = {x=current.x, y=current.y, z=current.z-1}
+        current = {x=current.x, y=current.y, z=current.z+1}
     elseif facing == "west" then
         current = {x=current.x-1, y=current.y, z=current.z}
     end
@@ -100,11 +100,11 @@ local function contextAwareBack()
         return false
     end
     if facing == "north" then
-        current = {x=current.x, y=current.y, z=current.z-1}
+        current = {x=current.x, y=current.y, z=current.z+1}
     elseif facing == "east" then
         current = {x=current.x-1, y=current.y, z=current.z}
     elseif facing == "south" then
-        current = {x=current.x, y=current.y, z=current.z+1}
+        current = {x=current.x, y=current.y, z=current.z-1}
     elseif facing == "west" then
         current = {x=current.x+1, y=current.y, z=current.z}
     end
@@ -297,20 +297,38 @@ end
 -- TODO: Check correctness
 local function returnToStart()
     print("Returning to start")
-    -- Trace back path
+    -- Trace back path step by step
     for i = #path, 1, -1 do
-        print("Tracing back path")
-        local point = path[i]
-        while current.x > point.x do
-            contextAwareBack()
-        end
-        while current.y > point.y do
-            contextAwareDown()
-        end
-        while current.z > point.z do
-            contextAwareTurnRight()
+        local step = path[i]
+        while current.x < step.x do
+            while facing ~= "west" do
+                contextAwareTurnRight()
+            end
             contextAwareForward()
-            contextAwareTurnRight()
+        end
+        while current.x > step.x do
+            while facing ~= "east" do
+                contextAwareTurnRight()
+            end
+            contextAwareForward()
+        end
+        while current.z < step.z do
+            while facing ~= "north" do
+                contextAwareTurnRight()
+            end
+            contextAwareForward()
+        end
+        while current.z > step.z do
+            while facing ~= "south" do
+                contextAwareTurnRight()
+            end
+            contextAwareForward()
+        end
+        while current.y < step.y do
+            contextAwareUp()
+        end
+        while current.y > step.y do
+            contextAwareDown()
         end
     end
 end
