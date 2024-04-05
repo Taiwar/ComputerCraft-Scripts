@@ -29,7 +29,7 @@ local function info(state, task)
 end
 
 local function dumpLogToFile()
-    local file = io.open("log.txt", "w")
+    local file = fs.open("log.txt", "w")
     if file == nil then
         error("Could not open file")
     end
@@ -170,6 +170,16 @@ local function isOverFarm()
     return isCrop
 end
 
+local function isFacingObstacle()
+    local hasBlock, data = turtle.inspect()
+    if not hasBlock then
+        return false
+    end
+    -- Check if block has growth metadata
+    local isCrop = data["tags"][CROP_TAG]
+    return not isCrop
+end
+
 local function shouldMoveDown()
     local hasBlock, data = turtle.inspectDown()
     if hasBlock then
@@ -294,32 +304,31 @@ local function laneChange(tries)
     return laneChange(tries+1)
 end
 
--- TODO: Check correctness
+-- TODO: Definitely broken
 local function returnToStart()
-    print("Returning to start")
     -- Trace back path step by step
     for i = #path, 1, -1 do
         local step = path[i]
         while current.x < step.x do
-            while facing ~= "west" do
-                contextAwareTurnRight()
-            end
-            contextAwareForward()
-        end
-        while current.x > step.x do
             while facing ~= "east" do
                 contextAwareTurnRight()
             end
             contextAwareForward()
         end
+        while current.x > step.x do
+            while facing ~= "west" do
+                contextAwareTurnRight()
+            end
+            contextAwareForward()
+        end
         while current.z < step.z do
-            while facing ~= "north" do
+            while facing ~= "south" do
                 contextAwareTurnRight()
             end
             contextAwareForward()
         end
         while current.z > step.z do
-            while facing ~= "south" do
+            while facing ~= "north" do
                 contextAwareTurnRight()
             end
             contextAwareForward()
@@ -340,6 +349,7 @@ local function mainCycle()
         if forceReturn or isAtEnd() then
             dumpLogToFile()
             working = false
+            info(STATE, "Returning to start. Forced return?: "..tostring(forceReturn))
             returnToStart()
             if isAtStart() then
                 info(STATE, "Finished farming")
@@ -348,7 +358,9 @@ local function mainCycle()
             end
         else
             info(STATE, "Moving to next block")
-            nextMove()
+            if not isFacingObstacle() then
+                nextMove()
+            end
             if isOverFarm() then
                 info(STATE, "Harvesting")
                 harvest()
