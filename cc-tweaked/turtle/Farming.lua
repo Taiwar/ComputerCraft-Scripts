@@ -18,6 +18,8 @@ local isPathTracing = true
 local facing = "north" -- Relative
 local log = {}
 
+---- START UTILITY FUNCTIONS ----
+
 local function info(state, task)
     term.clear()
     term.setCursorPos(1, 1)
@@ -76,6 +78,10 @@ local function isAtEnd()
     turtle.select(END_BLOCK_SLOT)
     return turtle.compareDown()
 end
+
+---- END UTILITY FUNCTIONS ----
+
+---- START BASIC MOVEMENT FUNCTIONS ----
 
 local function contextAwareForward()
     local success = turtle.forward()
@@ -155,6 +161,50 @@ local function contextAwareUp()
     return success
 end
 
+local function faceDirection(direction)
+    if facing == direction then
+        return
+    elseif facing == "north" then
+        if direction == "east" then
+            contextAwareTurnRight()
+        elseif direction == "south" then
+            contextAwareTurnRight()
+            contextAwareTurnRight()
+        elseif direction == "west" then
+            contextAwareTurnLeft()
+        end
+    elseif facing == "east" then
+        if direction == "south" then
+            contextAwareTurnRight()
+        elseif direction == "west" then
+            contextAwareTurnRight()
+            contextAwareTurnRight()
+        elseif direction == "north" then
+            contextAwareTurnLeft()
+        end
+    elseif facing == "south" then
+        if direction == "west" then
+            contextAwareTurnRight()
+        elseif direction == "north" then
+            contextAwareTurnRight()
+            contextAwareTurnRight()
+        elseif direction == "east" then
+            contextAwareTurnLeft()
+        end
+    elseif facing == "west" then
+        if direction == "north" then
+            contextAwareTurnRight()
+        elseif direction == "east" then
+            contextAwareTurnRight()
+            contextAwareTurnRight()
+        elseif direction == "south" then
+            contextAwareTurnLeft()
+        end
+    end
+end
+
+---- END BASIC MOVEMENT FUNCTIONS ----
+
 local function harvest()
     turtle.select(currentHarvestSlot)
     turtle.placeDown()
@@ -162,6 +212,8 @@ local function harvest()
 
     -- TODO: Handle crops with seeds and other different mechanics
 end
+
+---- START FARMING FUNCTIONS ----
 
 local function isOverFarm()
     local hasBlock, data = turtle.inspectDown()
@@ -265,7 +317,11 @@ end
 -- TODO: Handle obstacles/lane size decreasing
 -- TODO: Handle lane size increasing
 local function laneChange(tries)
-    if tries and tries > 5 then
+    if tries == nil then
+        tries = 0
+    end
+    print("Attempting lane change. Tries: "..tries)
+    if tries > 5 then
         return false
     end
     local success = false
@@ -287,10 +343,12 @@ local function laneChange(tries)
         error("laneChange: Unexpected facing direction")
     end
     if success then
+        print("Lane change successful")
         return true
     end
     -- If we could not move forward, move one block back along the lane and try again
     -- We are facing back along the lane, so we should turn around and then move back
+    print("Could not move forward, backtracking and retrying lane change")
     contextAwareTurnLeft()
     local s = contextAwareTurnLeft()
     contextAwareBack()
@@ -310,27 +368,19 @@ local function returnToStart()
     for i = #path, 1, -1 do
         local step = path[i]
         while current.x < step.x do
-            while facing ~= "east" do
-                contextAwareTurnRight()
-            end
+            faceDirection("east")
             contextAwareForward()
         end
         while current.x > step.x do
-            while facing ~= "west" do
-                contextAwareTurnRight()
-            end
+            faceDirection("west")
             contextAwareForward()
         end
         while current.z < step.z do
-            while facing ~= "south" do
-                contextAwareTurnRight()
-            end
+            faceDirection("south")
             contextAwareForward()
         end
         while current.z > step.z do
-            while facing ~= "north" do
-                contextAwareTurnRight()
-            end
+            faceDirection("north")
             contextAwareForward()
         end
         while current.y < step.y do
@@ -340,11 +390,10 @@ local function returnToStart()
             contextAwareDown()
         end
     end
-    -- Face north
-    while facing ~= "north" do
-        contextAwareTurnRight()
-    end
+    faceDirection("north")
 end
+
+---- END FARMING FUNCTIONS ----
 
 local function mainCycle()
     local working = true
@@ -383,9 +432,11 @@ local function mainCycle()
             end
         end
         -- Debug sleep
-        os.sleep(1)
+        os.sleep(0)
     end
 end
+
+---- MAIN ----
 
 checkStartingConditions()
 mainCycle()
