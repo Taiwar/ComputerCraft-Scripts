@@ -27,7 +27,13 @@ local function info(state, task)
     p.print(p.text(state, colors.white))
     p.print(p.text(task, colors.green))
     -- Append log
-    table.insert(log, {state=state, task=task, position=current})
+    table.insert(log, {level="info", state=state, task=task, position=current})
+end
+
+local function debug(message)
+    p.print(p.text(message, colors.lightGray))
+    -- Append log
+    table.insert(log, {level="debug", state=state, task=task, position=current})
 end
 
 local function dumpLogToFile()
@@ -273,7 +279,7 @@ local function handleFieldCrossing()
     -- Check if block below is water
     local hasBlock, data = turtle.inspectDown()
     if hasBlock and data["name"] == "minecraft:water" then
-        print("Found water, crossing")
+        debug("Found water, crossing")
        -- Expect single block wide water streak -> Turn and move one more block
        if facing == "south" then
             contextAwareTurnRight()
@@ -298,12 +304,12 @@ local function handleFieldCrossing()
     -- Check if block below is farmland now
     hasBlock, data = turtle.inspectDown()
     if hasBlock and data["name"] == "minecraft:farmland" then
-        print("Found farm again, finishing crossing")
+        debug("Found farm again, finishing crossing")
         success = true
     else
         -- Expect field may have gotten shorter -> Move forward until we are over the field
         local tries = 5
-        print("Moving forward to find farm")
+        debug("Moving forward to find farm")
         while not isOverFarm() and tries > 0 do
             nextMove()
             tries = tries - 1
@@ -320,7 +326,7 @@ local function laneChange(tries)
     if tries == nil then
         tries = 0
     end
-    print("Attempting lane change. Tries: "..tries)
+    debug("Attempting lane change. Tries: "..tries)
     if tries > 5 then
         return false
     end
@@ -343,12 +349,12 @@ local function laneChange(tries)
         error("laneChange: Unexpected facing direction")
     end
     if success then
-        print("Lane change successful")
+        debug("Lane change successful")
         return true
     end
     -- If we could not move forward, move one block back along the lane and try again
     -- We are facing back along the lane, so we should turn around and then move back
-    print("Could not move forward, backtracking and retrying lane change")
+    debug("Could not move forward, backtracking and retrying lane change")
     contextAwareTurnLeft()
     local s = contextAwareTurnLeft()
     contextAwareBack()
@@ -440,4 +446,4 @@ end
 
 checkStartingConditions()
 mainCycle()
-print("Finished farming")
+debug("Finished farming")
