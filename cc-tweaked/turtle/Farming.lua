@@ -27,7 +27,7 @@ local function info(state, task)
     p.print(p.text(state, colors.white))
     p.print(p.text(task, colors.green))
     -- Append log
-    table.insert(log, {level="info", text=state..task, position=current})
+    table.insert(log, {level="info", text=state.." - "..task, position=current})
 end
 
 local function debug(message)
@@ -44,6 +44,16 @@ local function dumpLogToFile()
     for i, entry in ipairs(log) do
         file.write(entry["level"]..": "..entry["text"].." at xyz "..entry["position"]["x"]..", "..entry["position"]["y"]..", "..entry["position"]["z"].."\n")
     end
+    file.close()
+end
+
+local function dumpPositionLogToFile()
+    local file = fs.open("position_log.txt", "w")
+    if file == nil then
+        error("Could not open file")
+    end
+    local logTable = {current=current, facing=facing, path=path}
+    file.write(textutils.serialize(logTable))
     file.close()
 end
 
@@ -255,12 +265,14 @@ local function nextMove()
         local s = contextAwareUp()
         if s and isPathTracing then
             table.insert(path, current)
+            dumpPositionLogToFile()
         end
     end
     -- Do actual move
     local s = contextAwareForward()
     if s and isPathTracing then
         table.insert(path, current)
+        dumpPositionLogToFile()
     end
     -- Check if we can move down (we want to be as close to the ground as possible)
 
@@ -269,6 +281,7 @@ local function nextMove()
         s = contextAwareDown()
         if s and isPathTracing then
             table.insert(path, current)
+            dumpPositionLogToFile()
         end
     end
 end
@@ -287,6 +300,7 @@ local function handleFieldCrossing()
             contextAwareTurnLeft()
             if s and isPathTracing then
                 table.insert(path, current)
+                dumpPositionLogToFile()
             end
         elseif facing == "north" then
             contextAwareTurnLeft()
@@ -295,6 +309,7 @@ local function handleFieldCrossing()
 
             if s and isPathTracing then
                 table.insert(path, current)
+                dumpPositionLogToFile()
             end
         else
             error("handleFieldCrossing: Unexpected facing direction")
@@ -333,17 +348,19 @@ local function laneChange(tries)
     local success = false
     if facing == "north" then
         contextAwareTurnLeft()
-        local s = contextAwareForward()
+        success = contextAwareForward()
         contextAwareTurnLeft()
-        if s and isPathTracing then
+        if success and isPathTracing then
             table.insert(path, current)
+            dumpPositionLogToFile()
         end
     elseif facing == "south" then
         contextAwareTurnRight()
-        local s = contextAwareForward()
+        success = contextAwareForward()
         contextAwareTurnRight()
-        if s and isPathTracing then
+        if success and isPathTracing then
             table.insert(path, current)
+            dumpPositionLogToFile()
         end
     else
         error("laneChange: Unexpected facing direction")
@@ -360,6 +377,7 @@ local function laneChange(tries)
     contextAwareBack()
     if s and isPathTracing then
         table.insert(path, current)
+        dumpPositionLogToFile()
     end
     if tries == nil then
         tries = 0
@@ -368,7 +386,6 @@ local function laneChange(tries)
     return laneChange(tries+1)
 end
 
--- TODO: Definitely broken
 local function returnToStart()
     -- Trace back path step by step
     for i = #path, 1, -1 do
@@ -417,10 +434,11 @@ local function mainCycle()
             end
         else
             info(STATE, "Moving to next block")
-            if not isFacingObstacle() then
+            local isObstructed = isFacingObstacle()
+            if not isObstructed then
                 nextMove()
             end
-            if isOverFarm() then
+            if not isObstructed and isOverFarm() then
                 info(STATE, "Harvesting")
                 harvest()
             else 
@@ -437,6 +455,7 @@ local function mainCycle()
                 end
             end
         end
+        dumpLogToFile()
         -- Debug sleep
         os.sleep(0)
     end
