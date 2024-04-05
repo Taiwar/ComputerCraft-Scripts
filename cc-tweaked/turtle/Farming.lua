@@ -37,7 +37,7 @@ local function debug(message)
 end
 
 local function dumpLogToFile()
-    local file = fs.open("log.txt", "w")
+    local file = fs.open("log.txt", "w+")
     if file == nil then
         error("Could not open file")
     end
@@ -52,8 +52,14 @@ local function dumpPositionLogToFile()
     if file == nil then
         error("Could not open file")
     end
+    -- TODO: This may have side effects
+    -- Add index field to each path entry
+    for i, entry in ipairs(path) do
+        entry["index"] = i
+    end
+
     local logTable = {current=current, facing=facing, path=path}
-    file.write(textutils.serialize(logTable))
+    file.write(textutils.serialize(logTable, {allow_repetitions=true}))
     file.close()
 end
 
@@ -436,6 +442,7 @@ local function mainCycle()
             info(STATE, "Moving to next block")
             local isObstructed = isFacingObstacle()
             if not isObstructed then
+                debug("Not obstructed - Next move")
                 nextMove()
             end
             if not isObstructed and isOverFarm() then
@@ -443,8 +450,10 @@ local function mainCycle()
                 harvest()
             else 
                 info(STATE, "Lane change")
+                debug("Was obstructed? "..tostring(isObstructed))
                 laneChange()
                 if not isOverFarm() then
+                    debug("Field crossing necessary")
                     info(STATE, "Field crossing")
                     local success = handleFieldCrossing()
                     if not success then
@@ -452,6 +461,8 @@ local function mainCycle()
                         working = false
                         returnToStart()
                     end
+                else
+                    debug("Regular lane change successful")
                 end
             end
         end
