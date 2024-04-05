@@ -27,13 +27,13 @@ local function info(state, task)
     p.print(p.text(state, colors.white))
     p.print(p.text(task, colors.green))
     -- Append log
-    table.insert(log, {level="info", state=state, task=task, position=current})
+    table.insert(log, {level="info", text=state..task, position=current})
 end
 
 local function debug(message)
     p.print(p.text(message, colors.lightGray))
     -- Append log
-    table.insert(log, {level="debug", position=current})
+    table.insert(log, {level="debug", text=message, position=current})
 end
 
 local function dumpLogToFile()
@@ -42,7 +42,7 @@ local function dumpLogToFile()
         error("Could not open file")
     end
     for i, entry in ipairs(log) do
-        file.write(entry.state..": "..entry.task.."\n")
+        file.write(entry["level"]..": "..entry["text"].." at xyz "..entry["position"]["x"]..", "..entry["position"]["y"]..", "..entry["position"]["z"].."\n")
     end
     file.close()
 end
