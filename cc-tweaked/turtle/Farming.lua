@@ -6,7 +6,7 @@ local STATE = ""
 local CROP_TAG = "minecraft:crops"
 local START_BLOCK_SLOT = 1
 local END_BLOCK_SLOT = 2
-local PLACEABLE_BLOCK_SLOT = 3
+local PLACEABLE_BLOCK_SLOT = 5
 local RETURN_HOME_SLOT = 4
 local HARVEST_START_SLOT = 5
 
@@ -77,6 +77,19 @@ local function isAtEnd()
     return turtle.compareDown()
 end
 
+-- TODO: Extend to consider z axis
+local function contextAwareForward(notModifyCurrent)
+    turtle.forward()
+    if notModifyCurrent then
+        return
+    end
+    if isFacingForward then
+        current = {x=current.x+1, y=current.y, z=current.z}
+    else
+        current = {x=current.x-1, y=current.y, z=current.z}
+    end
+end
+
 local function harvest()
     turtle.select(currentHarvestSlot)
     turtle.placeDown()
@@ -113,8 +126,7 @@ local function nextMove()
         end
     end
     -- Do actual move
-    turtle.forward()
-    current = {x=current.x+1, y=current.y, z=current.z}
+    contextAwareForward()
     if isPathTracing then
         table.insert(path, current)
     end
@@ -139,7 +151,7 @@ local function handleFieldCrossing()
        -- Expect single block wide water streak -> Turn and move one more block
        if not isFacingForward then
             turtle.turnRight()
-            turtle.forward()
+            contextAwareForward(true)
             turtle.turnLeft()
             current = {x=current.x, y=current.y, z=current.z+1}
             if isPathTracing then
@@ -147,7 +159,7 @@ local function handleFieldCrossing()
             end
         else
             turtle.turnLeft()
-            turtle.forward()
+            contextAwareForward(true)
             turtle.turnRight()
             current = {x=current.x, y=current.y, z=current.z+1}
             if isPathTracing then
@@ -178,7 +190,7 @@ end
 local function laneChange()
     if isFacingForward then
         turtle.turnLeft()
-        turtle.forward()
+        contextAwareForward(true)
         turtle.turnLeft()
         current = {x=current.x, y=current.y, z=current.z+1}
         if isPathTracing then
@@ -187,7 +199,7 @@ local function laneChange()
         isFacingForward = false
     else
         turtle.turnRight()
-        turtle.forward()
+        contextAwareForward(true)
         turtle.turnRight()
         current = {x=current.x, y=current.y, z=current.z+1}
         if isPathTracing then
@@ -212,7 +224,7 @@ local function returnToStart()
         end
         while current.z > point.z do
             turtle.turnRight()
-            turtle.forward()
+            contextAwareForward(true)
             turtle.turnRight()
             current = {x=current.x, y=current.y, z=current.z-1}
         end
@@ -256,6 +268,9 @@ local function mainCycle()
         os.sleep(1)
     end
 end
+-- Equip harvest tool
+turtle.select(HARVEST_START_SLOT)
+turtle.equipLeft()
 
 checkStartingConditions()
 mainCycle()
