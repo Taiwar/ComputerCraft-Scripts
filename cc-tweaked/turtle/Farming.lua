@@ -9,13 +9,15 @@ local END_BLOCK_SLOT = 2
 local PLACEABLE_BLOCK_SLOT = 5
 local RETURN_HOME_SLOT = 4
 local HARVEST_START_SLOT = 5
+local START_FACING = "east"
+local DO_PICKUP = false
 
 local currentHarvestSlot = HARVEST_START_SLOT
 local start = {x=0, y=0, z=0}
 local current = {x=0, y=0, z=0}
 local path = {current}
 local isPathTracing = true
-local facing = "north" -- Relative
+local facing = START_FACING
 local log = {}
 
 ---- START UTILITY FUNCTIONS ----
@@ -52,11 +54,6 @@ local function dumpPositionLogToFile()
     if file == nil then
         error("Could not open file")
     end
-    -- TODO: This may have side effects
-    -- Add index field to each path entry
-    for i, entry in ipairs(path) do
-        entry["index"] = i
-    end
 
     local logTable = {current=current, facing=facing, path=path}
     file.write(textutils.serialize(logTable, {allow_repetitions=true}))
@@ -89,16 +86,6 @@ local function checkStartingConditions()
     if turtle.getItemCount(RETURN_HOME_SLOT) > 0 then
         error("Debug: Return home slot is not empty")
     end
-end
-
-local function isAtStart()
-    turtle.select(START_BLOCK_SLOT)
-    return turtle.compareDown()
-end
-
-local function isAtEnd()
-    turtle.select(END_BLOCK_SLOT)
-    return turtle.compareDown()
 end
 
 ---- END UTILITY FUNCTIONS ----
@@ -225,17 +212,39 @@ local function faceDirection(direction)
     end
 end
 
+local function getOppositeDirection(direction)
+    if direction == "north" then
+        return "south"
+    elseif direction == "south" then
+        return "north"
+    elseif direction == "east" then
+        return "west"
+    elseif direction == "west" then
+        return "east"
+    end
+end
+
+local function getPrimaryFacing()
+    if facing == START_FACING then
+        return "forward"
+    elseif facing == getOppositeDirection(START_FACING) then
+        return "back"
+    else
+        return "side"
+    end
+end
+
 ---- END BASIC MOVEMENT FUNCTIONS ----
+
+---- START FARMING FUNCTIONS ----
 
 local function harvest()
     turtle.select(currentHarvestSlot)
     turtle.placeDown()
-    turtle.suckDown()
-
-    -- TODO: Handle crops with seeds and other different mechanics
+    if DO_PICKUP then
+        turtle.suckDown()
+    end
 end
-
----- START FARMING FUNCTIONS ----
 
 local function isOverFarm()
     local hasBlock, data = turtle.inspectDown()
@@ -308,7 +317,7 @@ local function handleFieldCrossing()
     if hasBlock and data["name"] == "minecraft:water" then
         debug("Found water, crossing")
        -- Expect single block wide water streak -> Turn and move one more block
-       if facing == "south" then
+       if getPrimaryFacing() == "back" then
             contextAwareTurnRight()
             raiseAboveObstacle()
             success = contextAwareForward()
@@ -317,7 +326,7 @@ local function handleFieldCrossing()
                 table.insert(path, current)
                 dumpPositionLogToFile()
             end
-        elseif facing == "north" then
+        elseif getPrimaryFacing() == "forward" then
             contextAwareTurnLeft()
             raiseAboveObstacle()
             success = contextAwareForward()
@@ -354,7 +363,6 @@ local function handleFieldCrossing()
 end
 
 -- Assumption: We move leftwards over the farm
--- TODO: Handle obstacles/lane size decreasing
 -- TODO: Handle lane size increasing
 local function laneChange(tries)
     if tries == nil then
@@ -365,7 +373,7 @@ local function laneChange(tries)
         return false
     end
     local success = false
-    if facing == "north" then
+    if getPrimaryFacing() == "forward" then
         contextAwareTurnLeft()
         success = contextAwareForward()
         contextAwareTurnLeft()
@@ -373,7 +381,7 @@ local function laneChange(tries)
             table.insert(path, current)
             dumpPositionLogToFile()
         end
-    elseif facing == "south" then
+    elseif getPrimaryFacing() == "back" then
         contextAwareTurnRight()
         success = contextAwareForward()
         contextAwareTurnRight()
@@ -435,8 +443,20 @@ local function returnToStart()
     faceDirection("north")
 end
 
+local function isAtStart()
+    turtle.select(START_BLOCK_SLOT)
+    return turtle.compareDown()
+end
+
+local function isAtEnd()
+    lowerToGround()
+    turtle.select(END_BLOCK_SLOT)
+    return turtle.compareDown()
+end
+
 ---- END FARMING FUNCTIONS ----
 
+-- TODO: Fix harvesting "blind spots" where the turtle does not harvest the last or first block of a lane due to lane change
 local function mainCycle()
     local working = true
     while working do
@@ -457,6 +477,9 @@ local function mainCycle()
             if not isObstructed then
                 debug("Not obstructed - Next move")
                 nextMove()
+                if isAtEnd() then
+                    goto continue
+                end
             end
             if not isObstructed and isOverFarm() then
                 info(STATE, "Harvesting")
@@ -480,8 +503,7 @@ local function mainCycle()
             end
         end
         dumpLogToFile()
-        -- Debug sleep
-        os.sleep(0)
+        ::continue::
     end
 end
 
