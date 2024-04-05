@@ -13,7 +13,7 @@ local START_FACING = "east"
 local DO_PICKUP = false
 local REFUEL_SIDE = "west"
 local REFUEL_SLOT = 3
-local CYCLE_SLEEP = 10
+local CYCLE_SLEEP = 60
 
 local currentHarvestSlot = HARVEST_START_SLOT
 local start = {x=0, y=0, z=0}
@@ -533,9 +533,9 @@ local function mainCycle()
 end
 
 -- TODO: We could probably do something smarter that just clearing the path after each cycle
-local function clearPath()
+local function resetLogs()
     path = {current}
-    dumpPositionLogToFile()
+    log = {}
 end
 
 ---- MAIN ----
@@ -547,7 +547,7 @@ while true do
     refuelFromInv()
     info(STATE, "Main cycle")
     mainCycle()
-    clearPath()
+    resetLogs()
     STATE = "Finished farming"
     info(STATE, "Waiting for next cycle")
     -- TODO: We could track the time it takes to farm and adjust the sleep time accordingly
