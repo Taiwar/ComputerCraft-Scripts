@@ -440,7 +440,7 @@ local function returnToStart()
             contextAwareDown()
         end
     end
-    faceDirection("north")
+    faceDirection(START_FACING)
 end
 
 local function isAtStart()
