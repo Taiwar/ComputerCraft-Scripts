@@ -11,6 +11,9 @@ local RETURN_HOME_SLOT = 4
 local HARVEST_START_SLOT = 5
 local START_FACING = "east"
 local DO_PICKUP = false
+local REFUEL_SIDE = "west"
+local REFUEL_SLOT = 3
+local CYCLE_SLEEP = 10
 
 local currentHarvestSlot = HARVEST_START_SLOT
 local start = {x=0, y=0, z=0}
@@ -43,7 +46,7 @@ local function dumpLogToFile()
     if file == nil then
         error("Could not open file")
     end
-    for i, entry in ipairs(log) do
+    for _, entry in ipairs(log) do
         file.write(entry["level"]..": "..entry["text"].." at xyz "..entry["position"]["x"]..", "..entry["position"]["y"]..", "..entry["position"]["z"].."\n")
     end
     file.close()
@@ -64,11 +67,11 @@ local function verboseWait(time)
     if time < 0 then
         return
     end
-    local current = 0
-    while current < time do
-        info(STATE, "Waiting: "..time-current.." more seconds")
+    local currentTime = 0
+    while currentTime < time do
+        info(STATE, "Waiting: "..time-currentTime.." more seconds")
         os.sleep(1)
-        current = current + 1
+        currentTime = currentTime + 1
     end
 end
 
@@ -265,11 +268,6 @@ end
 
 local function shouldMoveDown()
     local hasBlock, data = turtle.inspectDown()
-    if hasBlock then
-        STATE = "Last detected block: "..data["name"].." at "..current.x..", "..current.y..", "..current.z
-    else
-        STATE = "Last detected block: None at "..current.x..", "..current.y..", "..current.z
-    end
     return not hasBlock and data["name"] ~= "minecraft:water"
 end
 
@@ -413,6 +411,11 @@ local function laneChange(tries)
     return laneChange(tries+1)
 end
 
+local function findShortestPathBack()
+    -- Build grid
+end
+
+-- TODO: We could try to do some pathfinding to find a shorter path back
 local function returnToStart()
     -- Trace back path step by step
     for i = #path, 1, -1 do
@@ -456,15 +459,36 @@ end
 
 ---- END FARMING FUNCTIONS ----
 
+local function refuelFromInv()
+    local origSelected = turtle.getSelectedSlot()
+    local origFacing = facing
+
+    faceDirection(REFUEL_SIDE)
+    turtle.select(REFUEL_SLOT)
+    
+    turtle.suck()
+    turtle.refuel()
+    -- Drop excess fuel
+    turtle.drop()
+
+    turtle.select(origSelected)
+    faceDirection(origFacing)
+end
+
 -- TODO: Fix harvesting "blind spots" where the turtle does not harvest the last or first block of a lane due to lane change
 local function mainCycle()
     local working = true
     while working do
         local forceReturn = turtle.getItemCount(RETURN_HOME_SLOT) > 0
         if forceReturn or isAtEnd() then
+            STATE = "Returning to start"
             dumpLogToFile()
             working = false
-            info(STATE, "Returning to start. Forced return?: "..tostring(forceReturn))
+            if forceReturn then
+                info(STATE, "Forced return")
+            else
+                info(STATE, "Found end block")
+            end
             returnToStart()
             if isAtStart() then
                 info(STATE, "Finished farming")
@@ -472,6 +496,7 @@ local function mainCycle()
                 info(STATE, "Error: Not at start")
             end
         else
+            STATE = "Farming"
             info(STATE, "Moving to next block")
             local isObstructed = isFacingObstacle()
             if not isObstructed then
@@ -507,8 +532,24 @@ local function mainCycle()
     end
 end
 
+-- TODO: We could probably do something smarter that just clearing the path after each cycle
+local function clearPath()
+    path = {current}
+    dumpPositionLogToFile()
+end
+
 ---- MAIN ----
 
 checkStartingConditions()
-mainCycle()
-debug("Finished farming")
+while true do
+    STATE = "Starting farming"
+    info(STATE, "Refueling")
+    refuelFromInv()
+    info(STATE, "Main cycle")
+    mainCycle()
+    clearPath()
+    STATE = "Finished farming"
+    info(STATE, "Waiting for next cycle")
+    -- TODO: We could track the time it takes to farm and adjust the sleep time accordingly
+    verboseWait(CYCLE_SLEEP)
+end
