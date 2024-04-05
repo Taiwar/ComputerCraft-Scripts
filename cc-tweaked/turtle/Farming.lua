@@ -16,6 +16,7 @@ local current = {x=0, y=0, z=0}
 local path = {current}
 local isPathTracing = true
 local isFacingForward = true
+local facing = "north" -- Relative
 local log = {}
 
 local function info(state, task)
@@ -77,17 +78,70 @@ local function isAtEnd()
     return turtle.compareDown()
 end
 
--- TODO: Extend to consider z axis
-local function contextAwareForward(notModifyCurrent)
-    turtle.forward()
-    if notModifyCurrent then
-        return
-    end
-    if isFacingForward then
+local function contextAwareForward()
+    local success = turtle.forward()
+    if facing == "north" then
+        current = {x=current.x, y=current.y, z=current.z-1}
+    elseif facing == "east" then
         current = {x=current.x+1, y=current.y, z=current.z}
-    else
+    elseif facing == "south" then
+        current = {x=current.x, y=current.y, z=current.z+1}
+    elseif facing == "west" then
         current = {x=current.x-1, y=current.y, z=current.z}
     end
+    return success
+end
+
+local function contextAwareBack()
+    local success = turtle.back()
+    if facing == "north" then
+        current = {x=current.x, y=current.y, z=current.z+1}
+    elseif facing == "east" then
+        current = {x=current.x-1, y=current.y, z=current.z}
+    elseif facing == "south" then
+        current = {x=current.x, y=current.y, z=current.z-1}
+    elseif facing == "west" then
+        current = {x=current.x+1, y=current.y, z=current.z}
+    end
+    return success
+end
+
+local function contextAwareTurnRight()
+    turtle.turnRight()
+    if facing == "north" then
+        facing = "east"
+    elseif facing == "east" then
+        facing = "south"
+    elseif facing == "south" then
+        facing = "west"
+    elseif facing == "west" then
+        facing = "north"
+    end
+end
+
+local function contextAwareTurnLeft()
+    turtle.turnLeft()
+    if facing == "north" then
+        facing = "west"
+    elseif facing == "west" then
+        facing = "south"
+    elseif facing == "south" then
+        facing = "east"
+    elseif facing == "east" then
+        facing = "north"
+    end
+end
+
+local function contextAwareDown()
+    local success = turtle.down()
+    current = {x=current.x, y=current.y-1, z=current.z}
+    return success
+end
+
+local function contextAwareUp()
+    local success = turtle.up()
+    current = {x=current.x, y=current.y+1, z=current.z}
+    return success
 end
 
 local function harvest()
@@ -119,8 +173,7 @@ end
 local function nextMove()
     -- Check if we can move forward and if not, move up
     while turtle.detect() do
-        turtle.up()
-        current = {x=current.x, y=current.y+1, z=current.z}
+        contextAwareUp()
         if isPathTracing then
             table.insert(path, current)
         end
@@ -134,8 +187,7 @@ local function nextMove()
 
     -- Check if we can move down or if there is water
     while shouldMoveDown() do
-        turtle.down()
-        current = {x=current.x, y=current.y-1, z=current.z}
+        contextAwareDown()
         if isPathTracing then
             table.insert(path, current)
         end
@@ -150,18 +202,16 @@ local function handleFieldCrossing()
         print("Found water, crossing")
        -- Expect single block wide water streak -> Turn and move one more block
        if not isFacingForward then
-            turtle.turnRight()
-            contextAwareForward(true)
-            turtle.turnLeft()
-            current = {x=current.x, y=current.y, z=current.z+1}
+            contextAwareTurnRight()
+            contextAwareForward()
+            contextAwareTurnLeft()
             if isPathTracing then
                 table.insert(path, current)
             end
         else
-            turtle.turnLeft()
-            contextAwareForward(true)
-            turtle.turnRight()
-            current = {x=current.x, y=current.y, z=current.z+1}
+            contextAwareTurnLeft()
+            contextAwareForward()
+            contextAwareTurnRight()
             if isPathTracing then
                 table.insert(path, current)
             end
@@ -189,19 +239,17 @@ end
 -- Assumption: We move leftwards over the farm
 local function laneChange()
     if isFacingForward then
-        turtle.turnLeft()
-        contextAwareForward(true)
-        turtle.turnLeft()
-        current = {x=current.x, y=current.y, z=current.z+1}
+        contextAwareTurnLeft()
+        contextAwareForward()
+        contextAwareTurnLeft()
         if isPathTracing then
             table.insert(path, current)
         end
         isFacingForward = false
     else
-        turtle.turnRight()
-        contextAwareForward(true)
-        turtle.turnRight()
-        current = {x=current.x, y=current.y, z=current.z+1}
+        contextAwareTurnRight()
+        contextAwareForward()
+        contextAwareTurnRight()
         if isPathTracing then
             table.insert(path, current)
         end
@@ -215,18 +263,15 @@ local function returnToStart()
     for i = #path, 1, -1 do
         local point = path[i]
         while current.x > point.x do
-            turtle.back()
-            current = {x=current.x-1, y=current.y, z=current.z}
+            contextAwareBack()
         end
         while current.y > point.y do
-            turtle.down()
-            current = {x=current.x, y=current.y-1, z=current.z}
+            contextAwareDown()
         end
         while current.z > point.z do
-            turtle.turnRight()
-            contextAwareForward(true)
-            turtle.turnRight()
-            current = {x=current.x, y=current.y, z=current.z-1}
+            contextAwareTurnRight()
+            contextAwareForward()
+            contextAwareTurnRight()
         end
     end
 end
