@@ -15,7 +15,6 @@ local start = {x=0, y=0, z=0}
 local current = {x=0, y=0, z=0}
 local path = {current}
 local isPathTracing = true
-local isFacingForward = true
 local facing = "north" -- Relative
 local log = {}
 
@@ -80,30 +79,36 @@ end
 
 local function contextAwareForward()
     local success = turtle.forward()
+    if not success then
+        return false
+    end
     if facing == "north" then
-        current = {x=current.x, y=current.y, z=current.z-1}
+        current = {x=current.x, y=current.y, z=current.z+1}
     elseif facing == "east" then
         current = {x=current.x+1, y=current.y, z=current.z}
     elseif facing == "south" then
-        current = {x=current.x, y=current.y, z=current.z+1}
+        current = {x=current.x, y=current.y, z=current.z-1}
     elseif facing == "west" then
         current = {x=current.x-1, y=current.y, z=current.z}
     end
-    return success
+    return true
 end
 
 local function contextAwareBack()
     local success = turtle.back()
+    if not success then
+        return false
+    end
     if facing == "north" then
-        current = {x=current.x, y=current.y, z=current.z+1}
+        current = {x=current.x, y=current.y, z=current.z-1}
     elseif facing == "east" then
         current = {x=current.x-1, y=current.y, z=current.z}
     elseif facing == "south" then
-        current = {x=current.x, y=current.y, z=current.z-1}
+        current = {x=current.x, y=current.y, z=current.z+1}
     elseif facing == "west" then
         current = {x=current.x+1, y=current.y, z=current.z}
     end
-    return success
+    return true
 end
 
 local function contextAwareTurnRight()
@@ -134,12 +139,18 @@ end
 
 local function contextAwareDown()
     local success = turtle.down()
+    if not success then
+        return false
+    end
     current = {x=current.x, y=current.y-1, z=current.z}
     return success
 end
 
 local function contextAwareUp()
     local success = turtle.up()
+    if not success then
+        return false
+    end
     current = {x=current.x, y=current.y+1, z=current.z}
     return success
 end
@@ -173,27 +184,28 @@ end
 local function nextMove()
     -- Check if we can move forward and if not, move up
     while turtle.detect() do
-        contextAwareUp()
-        if isPathTracing then
+        local s = contextAwareUp()
+        if s and isPathTracing then
             table.insert(path, current)
         end
     end
     -- Do actual move
-    contextAwareForward()
-    if isPathTracing then
+    local s = contextAwareForward()
+    if s and isPathTracing then
         table.insert(path, current)
     end
     -- Check if we can move down (we want to be as close to the ground as possible)
 
     -- Check if we can move down or if there is water
     while shouldMoveDown() do
-        contextAwareDown()
-        if isPathTracing then
+        s = contextAwareDown()
+        if s and isPathTracing then
             table.insert(path, current)
         end
     end
 end
 
+-- TODO: Handle obstacles/lane size changes
 local function handleFieldCrossing()
     local success = false;
     -- Check if block below is water
@@ -201,20 +213,23 @@ local function handleFieldCrossing()
     if hasBlock and data["name"] == "minecraft:water" then
         print("Found water, crossing")
        -- Expect single block wide water streak -> Turn and move one more block
-       if not isFacingForward then
+       if facing == "south" then
             contextAwareTurnRight()
-            contextAwareForward()
+            local s = contextAwareForward()
             contextAwareTurnLeft()
-            if isPathTracing then
+            if s and isPathTracing then
+                table.insert(path, current)
+            end
+        elseif facing == "north" then
+            contextAwareTurnLeft()
+            local s = contextAwareForward()
+            contextAwareTurnRight()
+
+            if s and isPathTracing then
                 table.insert(path, current)
             end
         else
-            contextAwareTurnLeft()
-            contextAwareForward()
-            contextAwareTurnRight()
-            if isPathTracing then
-                table.insert(path, current)
-            end
+            error("handleFieldCrossing: Unexpected facing direction")
         end
         success = true
     end
@@ -237,30 +252,54 @@ local function handleFieldCrossing()
 end
 
 -- Assumption: We move leftwards over the farm
-local function laneChange()
-    if isFacingForward then
-        contextAwareTurnLeft()
-        contextAwareForward()
-        contextAwareTurnLeft()
-        if isPathTracing then
-            table.insert(path, current)
-        end
-        isFacingForward = false
-    else
-        contextAwareTurnRight()
-        contextAwareForward()
-        contextAwareTurnRight()
-        if isPathTracing then
-            table.insert(path, current)
-        end
-        isFacingForward = true
+-- TODO: Handle obstacles/lane size decreasing
+-- TODO: Handle lane size increasing
+local function laneChange(tries)
+    if tries and tries > 5 then
+        return false
     end
+    local success = false
+    if facing == "north" then
+        contextAwareTurnLeft()
+        local s = contextAwareForward()
+        contextAwareTurnLeft()
+        if s and isPathTracing then
+            table.insert(path, current)
+        end
+    elseif facing == "south" then
+        contextAwareTurnRight()
+        local s = contextAwareForward()
+        contextAwareTurnRight()
+        if s and isPathTracing then
+            table.insert(path, current)
+        end
+    else
+        error("laneChange: Unexpected facing direction")
+    end
+    if success then
+        return true
+    end
+    -- If we could not move forward, move one block back along the lane and try again
+    -- We are facing back along the lane, so we should turn around and then move back
+    contextAwareTurnLeft()
+    local s = contextAwareTurnLeft()
+    contextAwareBack()
+    if s and isPathTracing then
+        table.insert(path, current)
+    end
+    if tries == nil then
+        tries = 0
+    end
+    -- Retry lane change
+    return laneChange(tries+1)
 end
 
 -- TODO: Check correctness
 local function returnToStart()
+    print("Returning to start")
     -- Trace back path
     for i = #path, 1, -1 do
+        print("Tracing back path")
         local point = path[i]
         while current.x > point.x do
             contextAwareBack()
@@ -313,9 +352,6 @@ local function mainCycle()
         os.sleep(1)
     end
 end
--- Equip harvest tool
-turtle.select(HARVEST_START_SLOT)
-turtle.equipLeft()
 
 checkStartingConditions()
 mainCycle()
